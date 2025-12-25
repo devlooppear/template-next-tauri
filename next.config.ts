@@ -19,9 +19,6 @@ const isTauri = process.env.IS_TAURI === "true";
 const nextConfig: NextConfig = {
   output: isTauri ? "export" : undefined,
   devIndicators: false,
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
