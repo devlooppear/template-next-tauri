@@ -9,13 +9,15 @@ const withPWA = withPWAInit({
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
-  disable: currentEnv != Environment.LOCAL,
   workboxOptions: {
-    disableDevLogs: true,
+    disableDevLogs: currentEnv != Environment.LOCAL,
   },
 });
 
+const isTauri = process.env.IS_TAURI === "true";
+
 const nextConfig: NextConfig = {
+  output: isTauri ? "export" : undefined,
   devIndicators: false,
   eslint: {
     ignoreDuringBuilds: true,

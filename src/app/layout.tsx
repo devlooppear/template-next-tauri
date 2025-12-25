@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   applicationName: "Next.js Tauri PWA",
   title: "Next.js Tauri PWA",
   description: "A Next.js application with Tauri and PWA support.",
-  manifest: "/manifest.json",
+  manifest: "/logo/site.webmanifest",
   themeColor: "#000000",
   appleWebApp: {
     capable: true,

@@ -1,0 +1,135 @@
+name: "Release"
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - homolog
+    tags:
+      - "v*"
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-latest"
+            args: "--target x86_64-apple-darwin"
+          - platform: "ubuntu-22.04"
+            args: ""
+          - platform: "windows-latest"
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: install frontend dependencies
+        run: yarn install
+
+      - name: Set Release Info
+        id: release_info
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "suffix=" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/homolog" ]]; then
+            echo "suffix=-homolog" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "suffix=-dev" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IS_TAURI: true
+        with:
+          tagName: app-v__VERSION__${{ steps.release_info.outputs.suffix }}
+          releaseName: "App v__VERSION__${{ steps.release_info.outputs.suffix }}"
+          releaseBody: "See the assets to download this version and install."
+          releaseDraft: true
+          prerelease: ${{ steps.release_info.outputs.prerelease }}
+          args: ${{ matrix.args }}
+
+  publish-android:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: setup java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
+      - name: setup android sdk
+        uses: android-actions/setup-android@v3
+
+      - name: install android platform
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125"
+
+      - name: install frontend dependencies
+        run: yarn install
+
+      - name: build android
+        env:
+          IS_TAURI: true
+          NDK_HOME: ${{ steps.setup-android.outputs.sdk-path }}/ndk/26.1.10909125
+        run: |
+          yarn tauri android init
+          yarn tauri android build --apk
+
+      - name: Set Release Info
+        id: release_info
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "tag=app-v__VERSION__" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/homolog" ]]; then
+            echo "tag=app-v__VERSION__-homolog" >> $GITHUB_OUTPUT
+          else
+            echo "tag=app-v__VERSION__-dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: upload android artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          files: src-tauri/gen/android/app/build/outputs/apk/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
