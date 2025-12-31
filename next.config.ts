@@ -9,17 +9,13 @@ const withPWA = withPWAInit({
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
-  disable: currentEnv != Environment.LOCAL,
   workboxOptions: {
-    disableDevLogs: true,
+    disableDevLogs: currentEnv != Environment.LOCAL,
   },
 });
 
 const nextConfig: NextConfig = {
   devIndicators: false,
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
